@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+
+{% block title %}Overview Dashboard{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
+                <i class="fa-solid fa-gauge-high text-cyan-400"></i>
+                WAF Security Operations Dashboard
+            </h1>
+            <p class="text-xs text-slate-400 mt-1">Live monitoring, anomaly score telemetry, and perimeter enforcement metrics</p>
+        </div>
+        <div class="flex items-center gap-3">
+            <button id="refresh-stats-btn" class="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 text-xs font-medium transition flex items-center gap-2">
+                <i class="fa-solid fa-rotate text-cyan-400"></i> Refresh Metrics
+            </button>
+            <a href="/simulator" class="px-3.5 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-medium shadow-lg shadow-cyan-600/20 transition flex items-center gap-2">
+                <i class="fa-solid fa-play"></i> Attack Sandbox
+            </a>
+        </div>
+    </div>
+
+    <!-- KPI Summary Grid -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <!-- Total Requests -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 glow-card">
+            <div class="flex items-center justify-between text-slate-400 text-xs font-medium">
+                <span>Total Inspected</span>
+                <i class="fa-solid fa-network-wired text-cyan-400"></i>
+            </div>
+            <div class="mt-3 flex items-baseline gap-2">
+                <span id="stat-total" class="text-2xl font-bold text-white tracking-tight">0</span>
+                <span class="text-[11px] text-slate-500">requests</span>
+            </div>
+            <div class="mt-2 text-[11px] text-slate-400 flex items-center gap-1">
+                <i class="fa-solid fa-clock-rotate-left text-slate-500"></i> Lifetime telemetry
+            </div>
+        </div>
+
+        <!-- Blocked Requests -->
+        <div class="bg-slate-900 border border-red-500/30 rounded-2xl p-5 glow-card">
+            <div class="flex items-center justify-between text-red-400 text-xs font-medium">
+                <span>Blocked Attacks</span>
+                <i class="fa-solid fa-shield-virus"></i>
+            </div>
+            <div class="mt-3 flex items-baseline gap-2">
+                <span id="stat-blocked" class="text-2xl font-bold text-red-400 tracking-tight">0</span>
+                <span class="text-[11px] text-red-300/60">403 Forbidden</span>
+            </div>
+            <div class="mt-2 text-[11px] text-red-400/80 flex items-center gap-1">
+                <i class="fa-solid fa-ban"></i> Neutralized at perimeter
+            </div>
+        </div>
+
+        <!-- Allowed Requests -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 glow-card">
+            <div class="flex items-center justify-between text-emerald-400 text-xs font-medium">
+                <span>Allowed Clean Traffic</span>
+                <i class="fa-solid fa-circle-check"></i>
+            </div>
+            <div class="mt-3 flex items-baseline gap-2">
+                <span id="stat-allowed" class="text-2xl font-bold text-emerald-400 tracking-tight">0</span>
+                <span class="text-[11px] text-emerald-300/60">200 OK</span>
+            </div>
+            <div class="mt-2 text-[11px] text-emerald-400/80 flex items-center gap-1">
+                <i class="fa-solid fa-check-double"></i> Passed inspection
+            </div>
+        </div>
+
+        <!-- Block Rate -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 glow-card">
+            <div class="flex items-center justify-between text-slate-400 text-xs font-medium">
+                <span>Interception Rate</span>
+                <i class="fa-solid fa-percent text-amber-400"></i>
+            </div>
+            <div class="mt-3 flex items-baseline gap-2">
+                <span id="stat-rate" class="text-2xl font-bold text-amber-400 tracking-tight">0%</span>
+                <span class="text-[11px] text-slate-500">ratio</span>
+            </div>
+            <div class="mt-2 text-[11px] text-slate-400 flex items-center gap-1">
+                <i class="fa-solid fa-filter text-slate-500"></i> Threat density
+            </div>
+        </div>
+
+        <!-- Active Rules -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 glow-card">
+            <div class="flex items-center justify-between text-slate-400 text-xs font-medium">
+                <span>Active SecRules</span>
+                <i class="fa-solid fa-shield-halved text-cyan-400"></i>
+            </div>
+            <div class="mt-3 flex items-baseline gap-2">
+                <span id="stat-rules" class="text-2xl font-bold text-cyan-400 tracking-tight">28</span>
+                <span class="text-[11px] text-slate-500">CRS rules</span>
+            </div>
+            <div class="mt-2 text-[11px] text-slate-400 flex items-center gap-1">
+                <i class="fa-solid fa-bolt text-emerald-400"></i> OWASP Top 10 Armed
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts & Policy Section -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Attack Breakdown Donut Chart -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-chart-pie text-cyan-400"></i> Attack Vector Distribution
+                </h3>
+                <span class="text-[11px] text-slate-400">OWASP CRS Hits</span>
+            </div>
+            <div class="relative h-64 flex items-center justify-center">
+                <canvas id="attack-chart"></canvas>
+            </div>
+        </div>
+
+        <!-- Traffic Volume Comparison Bar Chart -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-chart-column text-emerald-400"></i> Traffic Classification
+                </h3>
+                <span class="text-[11px] text-slate-400">Blocked vs Allowed</span>
+            </div>
+            <div class="relative h-64 flex items-center justify-center">
+                <canvas id="traffic-chart"></canvas>
+            </div>
+        </div>
+
+        <!-- Quick WAF Controls Panel -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between">
+            <div>
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-sliders text-amber-400"></i> Policy & Engine Controls
+                    </h3>
+                    <span class="text-[11px] text-emerald-400 font-mono">Real-time</span>
+                </div>
+
+                <div class="space-y-4 text-xs">
+                    <div>
+                        <label class="block font-medium text-slate-300 mb-1">SecRuleEngine State</label>
+                        <select id="ctrl-engine-mode" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-cyan-500">
+                            <option value="On">On - Filter, inspect & block malicious requests</option>
+                            <option value="DetectionOnly">DetectionOnly - Inspect & audit log without blocking</option>
+                            <option value="Off">Off - Completely bypass WAF perimeter inspection</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block font-medium text-slate-300 mb-1">Blocking Mode Architecture</label>
+                        <select id="ctrl-blocking-mode" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-cyan-500">
+                            <option value="anomaly_score">Anomaly Scoring Mode (OWASP CRS Standard)</option>
+                            <option value="immediate">Immediate Blocking Mode (Legacy ModSecurity)</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <div class="flex items-center justify-between mb-1">
+                            <label class="font-medium text-slate-300">Inbound Anomaly Score Threshold</label>
+                            <span id="ctrl-threshold-val" class="font-mono text-cyan-400 font-bold">5 pts</span>
+                        </div>
+                        <input id="ctrl-threshold" type="range" min="1" max="25" value="5" class="w-full accent-cyan-500 cursor-pointer">
+                        <p class="text-[10px] text-slate-500 mt-1">Requests with cumulative anomaly score ≥ threshold will be blocked (403).</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pt-4 border-t border-slate-800/80 flex items-center justify-between">
+                <button id="save-config-btn" class="w-full py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-medium text-xs rounded-xl transition flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-floppy-disk"></i> Apply Engine Configuration
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Intercepted Threat Stream -->
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+        <div class="p-5 border-b border-slate-800 flex items-center justify-between">
+            <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+                <i class="fa-solid fa-tower-broadcast text-red-400"></i> Live Perimeter Event Stream
+            </h3>
+            <a href="/logs" class="text-xs text-cyan-400 hover:text-cyan-300 transition flex items-center gap-1">
+                Full Audit Logs <i class="fa-solid fa-arrow-right text-[10px]"></i>
+            </a>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+                <thead class="bg-slate-950/70 text-slate-400 uppercase font-semibold text-[10px] tracking-wider border-b border-slate-800">
+                    <tr>
+                        <th class="py-3 px-4">Status</th>
+                        <th class="py-3 px-4">Time (UTC)</th>
+                        <th class="py-3 px-4">Method & URI</th>
+                        <th class="py-3 px-4">Client IP</th>
+                        <th class="py-3 px-4">Anomaly Score</th>
+                        <th class="py-3 px-4">Triggered Rules</th>
+                    </tr>
+                </thead>
+                <tbody id="recent-threats-tbody" class="divide-y divide-slate-800/60 font-mono text-slate-300">
+                    <tr>
+                        <td colspan="6" class="py-8 text-center text-slate-500 font-sans">
+                            <i class="fa-solid fa-radar text-2xl mb-2 block"></i>
+                            Waiting for simulated traffic. Fire an attack in the <a href="/simulator" class="text-cyan-400 underline">Attack Sandbox</a>.
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% endblock %}

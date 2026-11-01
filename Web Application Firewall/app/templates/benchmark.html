@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+
+{% block title %}Security Benchmark & Accuracy Evaluation{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
+                <i class="fa-solid fa-gauge-high text-emerald-400"></i>
+                WAF Security Benchmark & Detection Accuracy
+            </h1>
+            <p class="text-xs text-slate-400 mt-1">
+                Fires an automated test battery of 30 diverse attack vectors and legitimate benign requests to compute precision, sensitivity, and false positive rates.
+            </p>
+        </div>
+        <div>
+            <button id="run-benchmark-btn" class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white text-xs font-bold shadow-lg shadow-emerald-950/40 transition flex items-center gap-2">
+                <i class="fa-solid fa-play"></i> Run Benchmark Suite (30 Tests)
+            </button>
+        </div>
+    </div>
+
+    <!-- KPI Metrics Grid -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- Overall Accuracy -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 glow-card">
+            <span class="text-xs text-slate-400 font-medium block">Overall Detection Accuracy</span>
+            <div class="mt-2 flex items-baseline gap-2">
+                <span id="bm-accuracy" class="text-3xl font-extrabold text-white tracking-tight">--%</span>
+            </div>
+            <p class="text-[11px] text-slate-500 mt-1">(TP + TN) / Total</p>
+        </div>
+
+        <!-- Sensitivity / Recall -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 glow-card">
+            <span class="text-xs text-slate-400 font-medium block">Sensitivity (Recall Rate)</span>
+            <div class="mt-2 flex items-baseline gap-2">
+                <span id="bm-sensitivity" class="text-3xl font-extrabold text-emerald-400 tracking-tight">--%</span>
+            </div>
+            <p class="text-[11px] text-slate-500 mt-1">Attacks caught / Total attacks</p>
+        </div>
+
+        <!-- Specificity -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 glow-card">
+            <span class="text-xs text-slate-400 font-medium block">Specificity (Clean Traffic)</span>
+            <div class="mt-2 flex items-baseline gap-2">
+                <span id="bm-specificity" class="text-3xl font-extrabold text-cyan-400 tracking-tight">--%</span>
+            </div>
+            <p class="text-[11px] text-slate-500 mt-1">Benign allowed / Total benign</p>
+        </div>
+
+        <!-- Precision -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 glow-card">
+            <span class="text-xs text-slate-400 font-medium block">Precision</span>
+            <div class="mt-2 flex items-baseline gap-2">
+                <span id="bm-precision" class="text-3xl font-extrabold text-amber-400 tracking-tight">--%</span>
+            </div>
+            <p class="text-[11px] text-slate-500 mt-1">True threats / All blocked</p>
+        </div>
+    </div>
+
+    <!-- Confusion Matrix & Summary -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- 2x2 Confusion Matrix -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+            <h3 class="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+                <i class="fa-solid fa-table-cells text-cyan-400"></i> Confusion Matrix
+            </h3>
+            <div class="grid grid-cols-2 gap-3 text-xs">
+                <!-- True Positive -->
+                <div class="bg-emerald-950/40 border border-emerald-500/40 rounded-xl p-3.5 text-center">
+                    <span class="text-[10px] uppercase font-bold text-emerald-400 block">True Positive (TP)</span>
+                    <span id="bm-tp" class="text-2xl font-bold font-mono text-emerald-300 block my-1">--</span>
+                    <span class="text-[10px] text-slate-400">Malicious & Blocked</span>
+                </div>
+                <!-- False Positive -->
+                <div class="bg-red-950/30 border border-red-500/30 rounded-xl p-3.5 text-center">
+                    <span class="text-[10px] uppercase font-bold text-red-400 block">False Positive (FP)</span>
+                    <span id="bm-fp" class="text-2xl font-bold font-mono text-red-300 block my-1">--</span>
+                    <span class="text-[10px] text-slate-400">Benign & Blocked (Error)</span>
+                </div>
+                <!-- False Negative -->
+                <div class="bg-red-950/30 border border-red-500/30 rounded-xl p-3.5 text-center">
+                    <span class="text-[10px] uppercase font-bold text-red-400 block">False Negative (FN)</span>
+                    <span id="bm-fn" class="text-2xl font-bold font-mono text-red-300 block my-1">--</span>
+                    <span class="text-[10px] text-slate-400">Malicious & Allowed (Bypass)</span>
+                </div>
+                <!-- True Negative -->
+                <div class="bg-emerald-950/40 border border-emerald-500/40 rounded-xl p-3.5 text-center">
+                    <span class="text-[10px] uppercase font-bold text-emerald-400 block">True Negative (TN)</span>
+                    <span id="bm-tn" class="text-2xl font-bold font-mono text-emerald-300 block my-1">--</span>
+                    <span class="text-[10px] text-slate-400">Benign & Allowed</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Evaluation Explanation -->
+        <div class="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between">
+            <div>
+                <h3 class="text-sm font-semibold text-white mb-2 flex items-center gap-2">
+                    <i class="fa-solid fa-graduation-cap text-amber-400"></i> Methodology & Evaluation Metrics
+                </h3>
+                <div class="space-y-2 text-xs text-slate-300 leading-relaxed">
+                    <p>
+                        The benchmark test runner simulates requests against the ModSecurity engine using standard HTTP transactions across 7 threat domains:
+                        <strong>SQL Injection</strong>, <strong>XSS</strong>, <strong>Command Injection (RCE)</strong>, <strong>LFI</strong>, <strong>SSRF</strong>, <strong>Scanner Probes</strong>, and <strong>Benign Clean Traffic</strong>.
+                    </p>
+                    <ul class="list-disc pl-5 space-y-1 text-slate-400 text-[11px]">
+                        <li><strong class="text-slate-200">Sensitivity (100% target):</strong> Measures the percentage of true cyber attacks neutralized at the perimeter.</li>
+                        <li><strong class="text-slate-200">Specificity (100% target):</strong> Ensures that normal business users and harmless searches never get falsely blocked (Zero False Positives).</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="pt-3 text-[11px] text-slate-500 border-t border-slate-800">
+                Evaluation engine: OWASP Core Rule Set 3.x Anomaly Scoring Evaluation (Threshold: 5)
+            </div>
+        </div>
+    </div>
+
+    <!-- Detailed 30-case Test Matrix -->
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden glow-card">
+        <div class="p-4 border-b border-slate-800 flex items-center justify-between">
+            <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+                <i class="fa-solid fa-clipboard-check text-cyan-400"></i> Detailed Test Execution Results
+            </h3>
+            <span id="bm-status-label" class="text-xs text-slate-400 font-mono">Ready to execute</span>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+                <thead class="bg-slate-950/70 text-slate-400 uppercase font-semibold text-[10px] tracking-wider border-b border-slate-800">
+                    <tr>
+                        <th class="py-3 px-4">Test #</th>
+                        <th class="py-3 px-4">Status</th>
+                        <th class="py-3 px-4">Category</th>
+                        <th class="py-3 px-4">Test Case Name</th>
+                        <th class="py-3 px-4">Expected</th>
+                        <th class="py-3 px-4">Actual Result</th>
+                        <th class="py-3 px-4">Score</th>
+                        <th class="py-3 px-4 text-right">Latency</th>
+                    </tr>
+                </thead>
+                <tbody id="bm-results-tbody" class="divide-y divide-slate-800/60 font-mono text-slate-300">
+                    <tr>
+                        <td colspan="8" class="py-8 text-center text-slate-500 font-sans">
+                            Click <strong>"Run Benchmark Suite"</strong> above to launch the 30 automated security tests.
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.getElementById('run-benchmark-btn')?.addEventListener('click', async () => {
+        const btn = document.getElementById('run-benchmark-btn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Running 30 Security Tests...';
+
+        const statusLabel = document.getElementById('bm-status-label');
+        if (statusLabel) statusLabel.innerText = 'Evaluating ModSecurity CRS...';
+
+        try {
+            const res = await fetch('/api/benchmark', { method: 'POST' });
+            const data = await res.json();
+
+            // Populate KPIs
+            const m = data.metrics;
+            document.getElementById('bm-accuracy').innerText = `${m.accuracy}%`;
+            document.getElementById('bm-sensitivity').innerText = `${m.sensitivity}%`;
+            document.getElementById('bm-specificity').innerText = `${m.specificity}%`;
+            document.getElementById('bm-precision').innerText = `${m.precision}%`;
+
+            // Confusion Matrix
+            document.getElementById('bm-tp').innerText = m.tp;
+            document.getElementById('bm-fp').innerText = m.fp;
+            document.getElementById('bm-tn').innerText = m.tn;
+            document.getElementById('bm-fn').innerText = m.fn;
+
+            // Render Table
+            renderBenchmarkTable(data.results);
+            if (statusLabel) statusLabel.innerText = `Completed: ${m.accuracy}% Accuracy`;
+            showToast(`Benchmark completed: ${m.accuracy}% Accuracy (${m.tp} attacks caught)`, 'success');
+
+        } catch (err) {
+            showToast('Benchmark execution error: ' + err.message, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-play"></i> Run Benchmark Suite (30 Tests)';
+        }
+    });
+
+    function renderBenchmarkTable(results) {
+        const tbody = document.getElementById('bm-results-tbody');
+        if (!tbody || !results) return;
+
+        tbody.innerHTML = results.map(r => {
+            const passBadge = r.passed
+                ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">PASS</span>`
+                : `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-500/20 text-red-400 border border-red-500/30">FAIL</span>`;
+
+            const expectedStr = r.expected_blocked
+                ? `<span class="text-red-400">Block (403)</span>`
+                : `<span class="text-emerald-400">Allow (200)</span>`;
+
+            const actualStr = r.actual_blocked
+                ? `<span class="text-red-400 font-bold">Blocked (403)</span>`
+                : `<span class="text-emerald-400 font-bold">Allowed (200)</span>`;
+
+            return `
+                <tr class="hover:bg-slate-800/40 transition">
+                    <td class="py-3 px-4 text-slate-400 font-mono">#${r.id}</td>
+                    <td class="py-3 px-4">${passBadge}</td>
+                    <td class="py-3 px-4 font-sans text-slate-300">${r.type}</td>
+                    <td class="py-3 px-4 font-sans font-medium text-white">${r.name}</td>
+                    <td class="py-3 px-4">${expectedStr}</td>
+                    <td class="py-3 px-4">${actualStr}</td>
+                    <td class="py-3 px-4 text-amber-400 font-bold">${r.anomaly_score} pts</td>
+                    <td class="py-3 px-4 text-right text-slate-400">${r.latency_ms} ms</td>
+                </tr>
+            `;
+        }).join('');
+    }
+</script>
+{% endblock %}

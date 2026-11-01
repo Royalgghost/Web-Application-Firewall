@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+
+{% block title %}Attack Sandbox & Request Inspector{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
+                <i class="fa-solid fa-vial-virus text-cyan-400"></i>
+                Attack Sandbox & Request Inspector
+            </h1>
+            <p class="text-xs text-slate-400 mt-1">Simulate HTTP requests, test attack payloads, and visualize the ModSecurity CRS inspection pipeline in real-time.</p>
+        </div>
+        <div class="flex items-center gap-3">
+            <!-- Preset Selector -->
+            <div class="relative">
+                <select id="preset-selector" class="bg-slate-900 border border-cyan-500/40 text-cyan-300 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-cyan-400 cursor-pointer shadow-lg shadow-cyan-950/40">
+                    <option value="">⚡ Load Preset Payload...</option>
+                    <optgroup label="SQL Injection (SQLi)">
+                        <option value="sqli_boolean">SQLi: Boolean Logic Bypass (' OR 1=1 --)</option>
+                        <option value="sqli_union">SQLi: UNION SELECT Table Dump</option>
+                        <option value="sqli_sleep">SQLi: Time-based Blind SLEEP Probe</option>
+                        <option value="sqli_stacked">SQLi: Stacked Destructive Query (; DROP TABLE)</option>
+                    </optgroup>
+                    <optgroup label="Cross-Site Scripting (XSS)">
+                        <option value="xss_script">XSS: Classic &lt;script&gt; Tag Vector</option>
+                        <option value="xss_onerror">XSS: Image Onerror Event Handler</option>
+                        <option value="xss_svg">XSS: SVG Onload Execution</option>
+                        <option value="xss_uri">XSS: JavaScript Pseudo-Protocol</option>
+                    </optgroup>
+                    <optgroup label="Remote Code Execution (RCE)">
+                        <option value="rce_semicolon">RCE: Semicolon Command Chaining (; whoami)</option>
+                        <option value="rce_pipe">RCE: Pipe Shell Execution (| cat /etc/passwd)</option>
+                        <option value="rce_powershell">RCE: Windows PowerShell Invocation</option>
+                    </optgroup>
+                    <optgroup label="Local File Inclusion (LFI)">
+                        <option value="lfi_passwd">LFI: Directory Traversal (/etc/passwd)</option>
+                        <option value="lfi_win_ini">LFI: Windows System File (win.ini)</option>
+                        <option value="lfi_php_filter">LFI: Dangerous PHP Stream Wrapper</option>
+                    </optgroup>
+                    <optgroup label="SSRF & Scanners">
+                        <option value="ssrf_metadata">SSRF: AWS Cloud Metadata Probing (169.254.169.254)</option>
+                        <option value="scanner_sqlmap">Scanner: sqlmap Automated User-Agent</option>
+                        <option value="scanner_nikto">Scanner: Nikto Security Vulnerability Scanner</option>
+                    </optgroup>
+                    <optgroup label="Legitimate Benign Requests">
+                        <option value="benign_search">Benign: E-Commerce Product Search</option>
+                        <option value="benign_login">Benign: Standard Clean Login</option>
+                        <option value="benign_json">Benign: REST API Profile JSON Update</option>
+                    </optgroup>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Simulator Grid: Request Builder (Left) vs Inspection Visualizer (Right) -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- Left: HTTP Request Builder -->
+        <div class="lg:col-span-5 space-y-4">
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4 glow-card">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-code text-cyan-400"></i> HTTP Request Constructor
+                    </h3>
+                    <button id="reset-req-btn" class="text-[11px] text-slate-400 hover:text-slate-200 transition">Reset</button>
+                </div>
+
+                <!-- Method & URI -->
+                <div class="flex gap-2">
+                    <select id="req-method" class="bg-slate-950 border border-slate-800 text-cyan-400 font-bold text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:border-cyan-500">
+                        <option value="GET">GET</option>
+                        <option value="POST">POST</option>
+                        <option value="PUT">PUT</option>
+                        <option value="DELETE">DELETE</option>
+                        <option value="PATCH">PATCH</option>
+                    </select>
+                    <input id="req-uri" type="text" value="/search?q=laptop" placeholder="/path?query=val" class="flex-1 bg-slate-950 border border-slate-800 text-slate-200 font-mono text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:border-cyan-500">
+                </div>
+
+                <!-- Client IP -->
+                <div>
+                    <label class="block text-[11px] text-slate-400 font-medium mb-1">Simulated Client IP</label>
+                    <input id="req-client-ip" type="text" value="192.168.1.105" class="w-full bg-slate-950 border border-slate-800 text-slate-200 font-mono text-xs rounded-xl px-3 py-2 focus:outline-none focus:border-cyan-500">
+                </div>
+
+                <!-- Headers Editor -->
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <label class="text-[11px] text-slate-400 font-medium">HTTP Request Headers</label>
+                        <span class="text-[10px] text-slate-500">Key: Value (One per line)</span>
+                    </div>
+                    <textarea id="req-headers" rows="4" class="w-full bg-slate-950 border border-slate-800 text-slate-200 font-mono text-xs rounded-xl p-3 focus:outline-none focus:border-cyan-500">Host: app.local
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)
+Accept: text/html,application/json
+Content-Type: application/x-www-form-urlencoded</textarea>
+                </div>
+
+                <!-- Request Body -->
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <label class="text-[11px] text-slate-400 font-medium">HTTP Request Body</label>
+                        <div class="flex items-center gap-2 text-[10px]">
+                            <button id="body-format-form" class="text-cyan-400 font-medium">Form</button>
+                            <span class="text-slate-600">|</span>
+                            <button id="body-format-json" class="text-slate-400 hover:text-slate-200">JSON</button>
+                            <span class="text-slate-600">|</span>
+                            <button id="body-format-clear" class="text-slate-500 hover:text-slate-400">Clear</button>
+                        </div>
+                    </div>
+                    <textarea id="req-body" rows="4" placeholder="Request body payload (e.g. username=admin&password=...)" class="w-full bg-slate-950 border border-slate-800 text-slate-200 font-mono text-xs rounded-xl p-3 focus:outline-none focus:border-cyan-500"></textarea>
+                </div>
+
+                <!-- Submit Button -->
+                <button id="send-request-btn" class="w-full py-3 bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-cyan-900/30 transition flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-paper-plane"></i> Send & Inspect Through ModSecurity
+                </button>
+            </div>
+        </div>
+
+        <!-- Right: Inspection Pipeline & Decision Engine -->
+        <div class="lg:col-span-7 space-y-4">
+            <!-- Inspection Result Card -->
+            <div id="result-container" class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-5 glow-card">
+                <!-- Idle State Placeholder -->
+                <div id="idle-placeholder" class="py-16 text-center text-slate-500 space-y-3">
+                    <div class="w-16 h-16 rounded-full bg-slate-800/80 mx-auto flex items-center justify-center text-slate-400 text-2xl">
+                        <i class="fa-solid fa-microchip"></i>
+                    </div>
+                    <h3 class="text-slate-300 font-semibold text-sm">Engine Ready for Inspection</h3>
+                    <p class="text-xs text-slate-500 max-w-sm mx-auto">
+                        Select a preset attack payload from the top dropdown or craft a custom HTTP request, then click Send.
+                    </p>
+                </div>
+
+                <!-- Active Result Display (Hidden initially) -->
+                <div id="active-result" class="hidden space-y-5">
+                    <!-- Banner -->
+                    <div id="status-banner" class="p-4 rounded-xl border flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <div id="status-icon" class="w-12 h-12 rounded-xl flex items-center justify-center text-xl"></div>
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <span id="status-tag" class="text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded"></span>
+                                    <span id="tx-id-badge" class="text-xs font-mono text-slate-400"></span>
+                                </div>
+                                <h3 id="status-title" class="text-base font-bold text-white mt-0.5"></h3>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-[10px] text-slate-400 uppercase font-medium">Latency</div>
+                            <div id="exec-time" class="font-mono text-xs font-bold text-slate-200"></div>
+                        </div>
+                    </div>
+
+                    <!-- Anomaly Score Meter & Score Breakdown -->
+                    <div class="bg-slate-950 border border-slate-800 rounded-xl p-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs font-medium text-slate-300">Inbound Anomaly Score</span>
+                            <span id="score-meter-text" class="text-xs font-mono font-bold"></span>
+                        </div>
+                        <!-- Progress Bar -->
+                        <div class="w-full h-3 bg-slate-900 rounded-full overflow-hidden p-0.5 border border-slate-800">
+                            <div id="score-progress-bar" class="h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+                        </div>
+                        <!-- Breakdown Tags -->
+                        <div id="score-breakdown" class="mt-3 flex flex-wrap gap-2 text-[11px] font-mono"></div>
+                    </div>
+
+                    <!-- Step-by-Step Inspection Pipeline -->
+                    <div>
+                        <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
+                            <i class="fa-solid fa-diagram-project text-cyan-400"></i> Inspection Pipeline Trace
+                        </h4>
+                        <div id="pipeline-steps-container" class="space-y-2.5"></div>
+                    </div>
+
+                    <!-- ModSecurity SecAuditLog Tab / Raw View -->
+                    <div>
+                        <div class="flex items-center justify-between mb-2">
+                            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                                <i class="fa-solid fa-file-code text-cyan-400"></i> SecAuditLog (Native ModSecurity Format)
+                            </h4>
+                            <button id="copy-audit-log-btn" class="text-[11px] text-cyan-400 hover:text-cyan-300 transition flex items-center gap-1">
+                                <i class="fa-solid fa-copy"></i> Copy Log
+                            </button>
+                        </div>
+                        <pre id="raw-audit-log-pre" class="bg-slate-950 border border-slate-800 rounded-xl p-4 text-[11px] font-mono text-slate-300 overflow-x-auto max-h-56"></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/simulator.js') }}"></script>
+{% endblock %}

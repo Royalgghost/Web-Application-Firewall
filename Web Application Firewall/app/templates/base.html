@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}WAF Simulator{% endblock %} - Web Application Firewall</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdfa',
+                            100: '#ccfbf1',
+                            500: '#14b8a6',
+                            600: '#0d9488',
+                            700: '#0f766e',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Custom styling -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+    {% block head %}{% endblock %}
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans antialiased selection:bg-cyan-500/30 selection:text-cyan-200">
+    <!-- Top Global Header / Status Bar -->
+    <header class="h-16 border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-40 px-4 sm:px-6 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-600 to-emerald-500 flex items-center justify-center text-white shadow-lg shadow-cyan-500/20">
+                <i class="fa-solid fa-shield-virus text-lg"></i>
+            </div>
+            <div>
+                <div class="flex items-center gap-2">
+                    <span class="font-bold text-base tracking-tight text-white">WAF Simulator</span>
+                    <span class="px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">
+                        ModSecurity + CRS
+                    </span>
+                </div>
+                <p class="text-[11px] text-slate-400 hidden sm:block">Perimeter Web Application Firewall & Attack Inspector</p>
+            </div>
+        </div>
+
+        <!-- Live Controls / Status Badges -->
+        <div class="flex items-center gap-3">
+            <!-- Engine State Badge -->
+            <div class="flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800 text-xs">
+                <span class="text-slate-400 font-medium">SecRuleEngine:</span>
+                <select id="global-engine-mode" class="bg-transparent text-emerald-400 font-bold focus:outline-none cursor-pointer">
+                    <option value="On" class="bg-slate-900 text-emerald-400">On (Enforce)</option>
+                    <option value="DetectionOnly" class="bg-slate-900 text-amber-400">DetectionOnly</option>
+                    <option value="Off" class="bg-slate-900 text-red-400">Off (Bypass)</option>
+                </select>
+            </div>
+
+            <!-- Anomaly Score Mode & Threshold -->
+            <div class="hidden md:flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800 text-xs">
+                <span class="text-slate-400">Threshold:</span>
+                <span id="global-threshold" class="font-mono text-cyan-400 font-bold">5 pts</span>
+            </div>
+
+            <a href="/app/" target="_blank" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-medium transition flex items-center gap-2">
+                <i class="fa-solid fa-arrow-up-right-from-square text-[10px] text-cyan-400"></i>
+                <span class="hidden sm:inline">Target App</span>
+            </a>
+        </div>
+    </header>
+
+    <div class="flex flex-1 overflow-hidden">
+        <!-- Sidebar Navigation -->
+        <aside class="w-64 border-r border-slate-800 bg-slate-900/50 flex flex-col shrink-0">
+            <div class="p-4 space-y-1">
+                <a href="/" class="sidebar-link flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition {% if request.path == '/' %}bg-cyan-500/10 text-cyan-400 border border-cyan-500/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
+                    <i class="fa-solid fa-chart-line w-4 text-center"></i>
+                    <span>Dashboard</span>
+                </a>
+
+                <a href="/simulator" class="sidebar-link flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition {% if request.path == '/simulator' %}bg-cyan-500/10 text-cyan-400 border border-cyan-500/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
+                    <i class="fa-solid fa-vial-virus w-4 text-center"></i>
+                    <span>Attack Sandbox</span>
+                </a>
+
+                <a href="/app/" class="sidebar-link flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition {% if '/app' in request.path %}bg-cyan-500/10 text-cyan-400 border border-cyan-500/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
+                    <i class="fa-solid fa-bullseye w-4 text-center text-amber-400"></i>
+                    <span>Target App Demo</span>
+                </a>
+
+                <a href="/rules" class="sidebar-link flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition {% if request.path == '/rules' %}bg-cyan-500/10 text-cyan-400 border border-cyan-500/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
+                    <i class="fa-solid fa-list-check w-4 text-center"></i>
+                    <span>ModSec Rules</span>
+                </a>
+
+                <a href="/logs" class="sidebar-link flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition {% if request.path == '/logs' %}bg-cyan-500/10 text-cyan-400 border border-cyan-500/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
+                    <i class="fa-solid fa-file-waveform w-4 text-center"></i>
+                    <span>Audit Logs</span>
+                </a>
+
+                <a href="/benchmark" class="sidebar-link flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition {% if request.path == '/benchmark' %}bg-cyan-500/10 text-cyan-400 border border-cyan-500/30{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}">
+                    <i class="fa-solid fa-gauge-high w-4 text-center text-emerald-400"></i>
+                    <span>Security Benchmark</span>
+                </a>
+            </div>
+
+            <div class="mt-auto p-4 border-t border-slate-800/80">
+                <div class="bg-slate-950/60 rounded-xl p-3 border border-slate-800 text-xs space-y-1.5">
+                    <div class="flex items-center justify-between text-slate-400">
+                        <span>OWASP CRS</span>
+                        <span class="text-emerald-400 font-mono">Active</span>
+                    </div>
+                    <div class="flex items-center justify-between text-slate-400">
+                        <span>Blocking Mode</span>
+                        <span class="text-cyan-400 font-medium">Anomaly Scoring</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-slate-950">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+
+    <!-- Global Notification Toast Container -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2"></div>
+
+    <!-- Base JS -->
+    <script>
+        // Global engine mode switcher
+        const globalEngineMode = document.getElementById('global-engine-mode');
+        async function fetchConfig() {
+            try {
+                const res = await fetch('/api/config');
+                const data = await res.json();
+                if (globalEngineMode) globalEngineMode.value = data.engine_mode;
+                const threshEl = document.getElementById('global-threshold');
+                if (threshEl) threshEl.innerText = data.inbound_anomaly_score_threshold + ' pts';
+            } catch (e) {
+                console.error(e);
+            }
+        }
+        if (globalEngineMode) {
+            globalEngineMode.addEventListener('change', async (e) => {
+                const newMode = e.target.value;
+                try {
+                    await fetch('/api/config', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ engine_mode: newMode })
+                    });
+                    showToast('WAF Engine mode set to ' + newMode, 'info');
+                } catch (err) {
+                    showToast('Failed to update engine mode', 'error');
+                }
+            });
+        }
+        fetchConfig();
+
+        function showToast(msg, type = 'info') {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+            const toast = document.createElement('div');
+            const bg = type === 'error' ? 'bg-red-900/90 border-red-500' : (type === 'success' ? 'bg-emerald-900/90 border-emerald-500' : 'bg-slate-800/90 border-cyan-500');
+            toast.className = `${bg} border text-white px-4 py-3 rounded-xl shadow-xl text-xs flex items-center gap-2 transform transition-all duration-300`;
+            toast.innerHTML = `<i class="fa-solid fa-circle-info"></i> <span>${msg}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

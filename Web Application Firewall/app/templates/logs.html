@@ -1,0 +1,270 @@
+{% extends "base.html" %}
+
+{% block title %}Audit Logs & Forensic Inspector{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
+                <i class="fa-solid fa-file-waveform text-cyan-400"></i>
+                ModSecurity SecAuditLog Inspector
+            </h1>
+            <p class="text-xs text-slate-400 mt-1">Detailed forensic transaction logs formatted according to ModSecurity Section A-Z standards.</p>
+        </div>
+        <div class="flex items-center gap-3">
+            <button id="export-logs-btn" class="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 text-xs font-medium transition flex items-center gap-2">
+                <i class="fa-solid fa-download text-cyan-400"></i> Export JSON
+            </button>
+            <button id="clear-logs-btn" class="px-3.5 py-2 rounded-xl bg-red-950/60 hover:bg-red-900/60 text-red-300 border border-red-800/40 text-xs font-medium transition flex items-center gap-2">
+                <i class="fa-solid fa-trash"></i> Clear Logs
+            </button>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div class="flex items-center gap-3 flex-1">
+            <div class="relative flex-1">
+                <i class="fa-solid fa-magnifying-glass text-slate-500 text-xs absolute left-3 top-3"></i>
+                <input id="log-search-input" type="text" placeholder="Filter by Transaction ID, Client IP, or URI..." class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-500">
+            </div>
+            <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer select-none">
+                <input id="filter-blocked-only" type="checkbox" class="accent-cyan-500">
+                <span>Blocked Threats Only</span>
+            </label>
+        </div>
+        <div class="flex items-center gap-2 text-xs text-slate-400">
+            <span>Show:</span>
+            <select id="log-limit-select" class="bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-slate-200">
+                <option value="25">25 entries</option>
+                <option value="50" selected>50 entries</option>
+                <option value="100">100 entries</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Logs Table -->
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden glow-card">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+                <thead class="bg-slate-950/70 text-slate-400 uppercase font-semibold text-[10px] tracking-wider border-b border-slate-800">
+                    <tr>
+                        <th class="py-3 px-4">Status</th>
+                        <th class="py-3 px-4">Tx ID</th>
+                        <th class="py-3 px-4">Timestamp (UTC)</th>
+                        <th class="py-3 px-4">Client IP</th>
+                        <th class="py-3 px-4">Method & URI</th>
+                        <th class="py-3 px-4">Anomaly Score</th>
+                        <th class="py-3 px-4">Rule Violations</th>
+                        <th class="py-3 px-4 text-right">Details</th>
+                    </tr>
+                </thead>
+                <tbody id="logs-tbody" class="divide-y divide-slate-800/60 font-mono text-slate-300">
+                    <tr>
+                        <td colspan="8" class="py-8 text-center text-slate-500 font-sans">
+                            <i class="fa-solid fa-spinner fa-spin text-xl mb-2 block"></i> Loading audit logs...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Forensic Log Detail Modal -->
+<div id="log-detail-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-3xl w-full p-6 space-y-4 shadow-2xl max-h-[90vh] flex flex-col">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-magnifying-glass-chart text-cyan-400"></i>
+                Transaction Forensic Log: <span id="detail-tx-id" class="text-amber-400 font-mono"></span>
+            </h3>
+            <button id="close-detail-modal-btn" class="text-slate-400 hover:text-white transition">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+        </div>
+
+        <div class="overflow-y-auto space-y-4 flex-1 pr-1 text-xs">
+            <!-- Summary Grid -->
+            <div class="grid grid-cols-3 gap-3">
+                <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
+                    <span class="text-slate-500 block text-[10px] uppercase">Client IP</span>
+                    <span id="detail-client-ip" class="font-bold text-slate-200"></span>
+                </div>
+                <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
+                    <span class="text-slate-500 block text-[10px] uppercase">Anomaly Score</span>
+                    <span id="detail-anomaly-score" class="font-bold text-red-400"></span>
+                </div>
+                <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
+                    <span class="text-slate-500 block text-[10px] uppercase">Decision</span>
+                    <span id="detail-decision" class="font-bold"></span>
+                </div>
+            </div>
+
+            <!-- Matched Rules Breakdown -->
+            <div>
+                <h4 class="font-bold text-slate-300 mb-2 uppercase text-[10px] tracking-wider">Triggered ModSecurity Directives</h4>
+                <div id="detail-rules-container" class="space-y-2"></div>
+            </div>
+
+            <!-- Raw SecAuditLog -->
+            <div>
+                <div class="flex items-center justify-between mb-1">
+                    <h4 class="font-bold text-slate-300 uppercase text-[10px] tracking-wider">Raw SecAuditLog Format</h4>
+                    <button id="copy-modal-audit-btn" class="text-cyan-400 hover:text-cyan-300 text-[11px] flex items-center gap-1">
+                        <i class="fa-solid fa-copy"></i> Copy
+                    </button>
+                </div>
+                <pre id="detail-raw-audit" class="bg-slate-950 border border-slate-800 rounded-xl p-3 text-[11px] font-mono text-slate-300 overflow-x-auto max-h-48"></pre>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let currentLogs = [];
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadAuditLogs();
+
+        document.getElementById('log-search-input')?.addEventListener('input', renderLogs);
+        document.getElementById('filter-blocked-only')?.addEventListener('change', loadAuditLogs);
+        document.getElementById('log-limit-select')?.addEventListener('change', loadAuditLogs);
+
+        document.getElementById('clear-logs-btn')?.addEventListener('click', async () => {
+            if (confirm('Are you sure you want to clear all stored audit logs?')) {
+                await fetch('/api/logs', { method: 'DELETE' });
+                showToast('Audit logs cleared', 'info');
+                loadAuditLogs();
+            }
+        });
+
+        document.getElementById('export-logs-btn')?.addEventListener('click', () => {
+            const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(currentLogs, null, 2));
+            const dlAnchor = document.createElement('a');
+            dlAnchor.setAttribute('href', dataStr);
+            dlAnchor.setAttribute('download', `waf_audit_logs_${Date.now()}.json`);
+            dlAnchor.click();
+        });
+
+        const detailModal = document.getElementById('log-detail-modal');
+        document.getElementById('close-detail-modal-btn')?.addEventListener('click', () => {
+            detailModal.classList.add('hidden');
+        });
+
+        document.getElementById('copy-modal-audit-btn')?.addEventListener('click', () => {
+            const text = document.getElementById('detail-raw-audit')?.innerText;
+            if (text) {
+                navigator.clipboard.writeText(text);
+                showToast('Audit log copied to clipboard!', 'success');
+            }
+        });
+    });
+
+    async function loadAuditLogs() {
+        const blockedOnly = document.getElementById('filter-blocked-only')?.checked || false;
+        const limit = document.getElementById('log-limit-select')?.value || 50;
+
+        try {
+            const res = await fetch(`/api/logs?blocked_only=${blockedOnly}&limit=${limit}`);
+            const data = await res.json();
+            currentLogs = data.logs || [];
+            renderLogs();
+        } catch (err) {
+            console.error('Error fetching logs:', err);
+        }
+    }
+
+    function renderLogs() {
+        const search = (document.getElementById('log-search-input')?.value || '').toLowerCase().trim();
+        const tbody = document.getElementById('logs-tbody');
+
+        const filtered = currentLogs.filter(l => {
+            return !search ||
+                l.transaction_id.toLowerCase().includes(search) ||
+                l.client_ip.toLowerCase().includes(search) ||
+                l.uri.toLowerCase().includes(search);
+        });
+
+        if (filtered.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="8" class="py-8 text-center text-slate-500 font-sans">
+                        No audit log entries matching this criteria.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        tbody.innerHTML = filtered.map(l => {
+            const statusBadge = l.is_blocked
+                ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-500/20 text-red-400 border border-red-500/30">403 BLOCKED</span>`
+                : `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">200 ALLOWED</span>`;
+
+            const scoreColor = l.anomaly_score >= 5 ? 'text-red-400 font-bold' : (l.anomaly_score > 0 ? 'text-amber-400' : 'text-slate-400');
+
+            const rulesStr = l.matched_rules && l.matched_rules.length > 0
+                ? l.matched_rules.map(r => `<span class="bg-slate-800 text-slate-200 px-1 py-0.5 rounded text-[10px] mr-1">#${r.rule_id}</span>`).join('')
+                : '<span class="text-slate-500 font-sans">0 rules</span>';
+
+            return `
+                <tr class="hover:bg-slate-800/40 transition">
+                    <td class="py-3 px-4">${statusBadge}</td>
+                    <td class="py-3 px-4 text-cyan-400 font-bold">${l.transaction_id}</td>
+                    <td class="py-3 px-4 text-slate-400 text-[11px]">${l.timestamp}</td>
+                    <td class="py-3 px-4 text-slate-200">${l.client_ip}</td>
+                    <td class="py-3 px-4">
+                        <span class="text-cyan-400 font-bold">${l.method}</span>
+                        <span class="text-slate-200 ml-1 truncate max-w-xs inline-block align-bottom" title="${l.uri}">${l.uri}</span>
+                    </td>
+                    <td class="py-3 px-4 ${scoreColor}">${l.anomaly_score} pts</td>
+                    <td class="py-3 px-4">${rulesStr}</td>
+                    <td class="py-3 px-4 text-right">
+                        <button onclick="viewLogDetail('${l.transaction_id}')" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-sans transition">
+                            View
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    function viewLogDetail(txId) {
+        const log = currentLogs.find(l => l.transaction_id === txId);
+        if (!log) return;
+
+        document.getElementById('detail-tx-id').innerText = txId;
+        document.getElementById('detail-client-ip').innerText = log.client_ip;
+        document.getElementById('detail-anomaly-score').innerText = `${log.anomaly_score} pts`;
+        document.getElementById('detail-decision').innerHTML = log.is_blocked
+            ? '<span class="text-red-400">BLOCKED (403 Forbidden)</span>'
+            : '<span class="text-emerald-400">ALLOWED (200 OK)</span>';
+
+        const rulesContainer = document.getElementById('detail-rules-container');
+        if (log.matched_rules && log.matched_rules.length > 0) {
+            rulesContainer.innerHTML = log.matched_rules.map(r => `
+                <div class="bg-slate-950 p-2.5 rounded-lg border border-slate-800">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-amber-400 font-bold font-mono">Rule [${r.rule_id}] - ${r.severity}</span>
+                        <span class="text-red-400 font-bold font-mono">+${r.anomaly_score} pts</span>
+                    </div>
+                    <p class="text-slate-300">${r.message}</p>
+                    <div class="mt-1 font-mono text-[10px] text-slate-400">
+                        Target: <span class="text-cyan-300">${r.variable_name}</span> | Matched: <span class="text-red-300 bg-red-950/60 px-1 rounded">${r.matched_data}</span>
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            rulesContainer.innerHTML = '<p class="text-slate-500 font-sans">No rules were triggered for this transaction.</p>';
+        }
+
+        document.getElementById('detail-raw-audit').innerText = log.raw_audit_log || 'N/A';
+        document.getElementById('log-detail-modal').classList.remove('hidden');
+    }
+</script>
+{% endblock %}

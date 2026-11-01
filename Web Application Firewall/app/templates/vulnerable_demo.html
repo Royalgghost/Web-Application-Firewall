@@ -1,0 +1,303 @@
+{% extends "base.html" %}
+
+{% block title %}Target Application Live Demo{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+            <div class="flex items-center gap-2">
+                <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-amber-500/10 text-amber-400 border border-amber-500/30">
+                    Live Test Bench
+                </span>
+                <span class="text-xs text-slate-400">Target Application Behind ModSecurity</span>
+            </div>
+            <h1 class="text-2xl font-bold tracking-tight text-white mt-1 flex items-center gap-2">
+                <i class="fa-solid fa-bullseye text-amber-400"></i>
+                Vulnerable Web App Simulation
+            </h1>
+            <p class="text-xs text-slate-400">Experience the difference between an unprotected application and an application defended by the ModSecurity WAF.</p>
+        </div>
+
+        <!-- Quick WAF Enforce Switcher -->
+        <div class="flex items-center gap-3 bg-slate-900 border border-slate-800 p-2 rounded-2xl">
+            <span class="text-xs text-slate-400 font-medium pl-2">WAF Protection:</span>
+            <button id="toggle-waf-state-btn" class="px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-950/50">
+                <i class="fa-solid fa-shield-halved"></i>
+                <span id="waf-state-btn-text">WAF is ENFORCING (Active)</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Vulnerability Category Tabs -->
+    <div class="flex flex-wrap gap-2 border-b border-slate-800 pb-3 text-xs font-medium">
+        <a href="/app/login" class="px-3.5 py-2 rounded-xl transition flex items-center gap-2 {% if page == 'login' %}bg-cyan-500/20 text-cyan-300 border border-cyan-500/40{% else %}text-slate-400 hover:bg-slate-900 hover:text-white{% endif %}">
+            <i class="fa-solid fa-database text-red-400"></i> SQL Injection (Auth)
+        </a>
+        <a href="/app/search" class="px-3.5 py-2 rounded-xl transition flex items-center gap-2 {% if page == 'search' %}bg-cyan-500/20 text-cyan-300 border border-cyan-500/40{% else %}text-slate-400 hover:bg-slate-900 hover:text-white{% endif %}">
+            <i class="fa-solid fa-code text-orange-400"></i> XSS (Search)
+        </a>
+        <a href="/app/ping" class="px-3.5 py-2 rounded-xl transition flex items-center gap-2 {% if page == 'ping' %}bg-cyan-500/20 text-cyan-300 border border-cyan-500/40{% else %}text-slate-400 hover:bg-slate-900 hover:text-white{% endif %}">
+            <i class="fa-solid fa-terminal text-purple-400"></i> Command Injection (Ping)
+        </a>
+        <a href="/app/view-file" class="px-3.5 py-2 rounded-xl transition flex items-center gap-2 {% if page == 'view-file' %}bg-cyan-500/20 text-cyan-300 border border-cyan-500/40{% else %}text-slate-400 hover:bg-slate-900 hover:text-white{% endif %}">
+            <i class="fa-solid fa-folder-open text-yellow-400"></i> Path Traversal (LFI)
+        </a>
+        <a href="/app/fetch-url" class="px-3.5 py-2 rounded-xl transition flex items-center gap-2 {% if page == 'fetch-url' %}bg-cyan-500/20 text-cyan-300 border border-cyan-500/40{% else %}text-slate-400 hover:bg-slate-900 hover:text-white{% endif %}">
+            <i class="fa-solid fa-cloud text-blue-400"></i> SSRF (Metadata)
+        </a>
+    </div>
+
+    <!-- Active Tab Content -->
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 glow-card">
+        {% if page == 'login' %}
+        <!-- SQL Injection Demo -->
+        <div class="max-w-xl mx-auto space-y-5">
+            <div class="text-center space-y-1">
+                <div class="w-12 h-12 bg-red-500/20 text-red-400 rounded-2xl flex items-center justify-center mx-auto text-xl border border-red-500/30">
+                    <i class="fa-solid fa-lock"></i>
+                </div>
+                <h2 class="text-lg font-bold text-white">Target App: Member Authentication Portal</h2>
+                <p class="text-xs text-slate-400">Backend executes dynamic SQL query vulnerable to tautology injection.</p>
+            </div>
+
+            {% if message %}
+            <div class="p-4 rounded-xl text-xs {% if exploited %}bg-red-950/80 border border-red-500/60 text-red-200{% elif success %}bg-emerald-950/80 border border-emerald-500/60 text-emerald-200{% else %}bg-slate-800 text-slate-300{% endif %}">
+                <div class="font-bold flex items-center gap-2">
+                    {% if exploited %}<i class="fa-solid fa-triangle-exclamation text-red-400"></i> EXPLOIT NOTICE{% endif %}
+                </div>
+                <p class="mt-1 font-mono">{{ message }}</p>
+            </div>
+            {% endif %}
+
+            <form action="/app/login" method="POST" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Username</label>
+                    <input type="text" name="username" id="sqli-username-input" value="admin' OR 1=1 --" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Password</label>
+                    <input type="password" name="password" value="anything" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-500">
+                </div>
+                <div class="flex items-center gap-3">
+                    <button type="submit" class="flex-1 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs rounded-xl transition">
+                        Submit Login Request
+                    </button>
+                    <button type="button" onclick="document.getElementById('sqli-username-input').value = 'admin'" class="px-3 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs transition">
+                        Fill Benign User
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        {% elif page == 'search' %}
+        <!-- Reflected XSS Demo -->
+        <div class="max-w-xl mx-auto space-y-5">
+            <div class="text-center space-y-1">
+                <div class="w-12 h-12 bg-orange-500/20 text-orange-400 rounded-2xl flex items-center justify-center mx-auto text-xl border border-orange-500/30">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                </div>
+                <h2 class="text-lg font-bold text-white">Target App: Catalog Search</h2>
+                <p class="text-xs text-slate-400">Reflects user search queries into HTML without encoding.</p>
+            </div>
+
+            {% if query %}
+            <div class="p-4 rounded-xl text-xs {% if exploited %}bg-orange-950/80 border border-orange-500/60 text-orange-200{% else %}bg-slate-800 text-slate-300{% endif %}">
+                <div class="font-bold flex items-center gap-2">
+                    Search Results for: <span class="font-mono text-cyan-300">{{ query }}</span>
+                </div>
+                {% if exploited %}
+                <p class="mt-2 text-red-300 font-mono">[!] Raw script or event tags injected into client browser!</p>
+                {% else %}
+                <p class="mt-2 text-slate-400">Found 3 matching catalog items.</p>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <form action="/app/search" method="GET" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Search Keyword / Payload</label>
+                    <input type="text" name="q" id="xss-input" value="<script>alert('XSS Exploit Successful!')</script>" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-500">
+                </div>
+                <div class="flex items-center gap-3">
+                    <button type="submit" class="flex-1 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs rounded-xl transition">
+                        Submit Search
+                    </button>
+                    <button type="button" onclick="document.getElementById('xss-input').value = 'smartphones'" class="px-3 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs transition">
+                        Fill Benign Query
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        {% elif page == 'ping' %}
+        <!-- Command Injection (RCE) Demo -->
+        <div class="max-w-xl mx-auto space-y-5">
+            <div class="text-center space-y-1">
+                <div class="w-12 h-12 bg-purple-500/20 text-purple-400 rounded-2xl flex items-center justify-center mx-auto text-xl border border-purple-500/30">
+                    <i class="fa-solid fa-terminal"></i>
+                </div>
+                <h2 class="text-lg font-bold text-white">Target App: Diagnostic Ping Utility</h2>
+                <p class="text-xs text-slate-400">Executes shell utility directly without input sanitization.</p>
+            </div>
+
+            {% if output %}
+            <div class="p-4 rounded-xl text-xs bg-slate-950 border {% if exploited %}border-red-500/60 text-red-300{% else %}border-slate-800 text-emerald-400{% endif %}">
+                <div class="font-bold text-slate-400 uppercase text-[10px] mb-1">System Terminal Output:</div>
+                <pre class="font-mono whitespace-pre-wrap">{{ output }}</pre>
+            </div>
+            {% endif %}
+
+            <form action="/app/ping" method="POST" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Host / IP to Ping</label>
+                    <input type="text" name="ip" id="ping-input" value="127.0.0.1; whoami" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-500">
+                </div>
+                <div class="flex items-center gap-3">
+                    <button type="submit" class="flex-1 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs rounded-xl transition">
+                        Execute Ping
+                    </button>
+                    <button type="button" onclick="document.getElementById('ping-input').value = '8.8.8.8'" class="px-3 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs transition">
+                        Fill Benign IP
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        {% elif page == 'view-file' %}
+        <!-- Path Traversal / LFI Demo -->
+        <div class="max-w-xl mx-auto space-y-5">
+            <div class="text-center space-y-1">
+                <div class="w-12 h-12 bg-yellow-500/20 text-yellow-400 rounded-2xl flex items-center justify-center mx-auto text-xl border border-yellow-500/30">
+                    <i class="fa-solid fa-file-shield"></i>
+                </div>
+                <h2 class="text-lg font-bold text-white">Target App: Document Viewer</h2>
+                <p class="text-xs text-slate-400">Reads files from disk using relative path parameter.</p>
+            </div>
+
+            {% if content %}
+            <div class="p-4 rounded-xl text-xs bg-slate-950 border {% if exploited %}border-yellow-500/60 text-yellow-300{% else %}border-slate-800 text-slate-300{% endif %}">
+                <div class="font-bold text-slate-400 uppercase text-[10px] mb-1">File Contents: {{ filename }}</div>
+                <pre class="font-mono whitespace-pre-wrap">{{ content }}</pre>
+            </div>
+            {% endif %}
+
+            <form action="/app/view-file" method="GET" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Filename / Path</label>
+                    <input type="text" name="file" id="lfi-input" value="../../../../etc/passwd" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-500">
+                </div>
+                <div class="flex items-center gap-3">
+                    <button type="submit" class="flex-1 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs rounded-xl transition">
+                        Read Document
+                    </button>
+                    <button type="button" onclick="document.getElementById('lfi-input').value = 'annual_report.txt'" class="px-3 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs transition">
+                        Fill Benign File
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        {% elif page == 'fetch-url' %}
+        <!-- SSRF Demo -->
+        <div class="max-w-xl mx-auto space-y-5">
+            <div class="text-center space-y-1">
+                <div class="w-12 h-12 bg-blue-500/20 text-blue-400 rounded-2xl flex items-center justify-center mx-auto text-xl border border-blue-500/30">
+                    <i class="fa-solid fa-globe"></i>
+                </div>
+                <h2 class="text-lg font-bold text-white">Target App: URL Previewer & Webhook</h2>
+                <p class="text-xs text-slate-400">Fetches external HTTP resources on behalf of the user.</p>
+            </div>
+
+            {% if response_data %}
+            <div class="p-4 rounded-xl text-xs bg-slate-950 border {% if exploited %}border-red-500/60 text-red-300{% else %}border-slate-800 text-slate-300{% endif %}">
+                <div class="font-bold text-slate-400 uppercase text-[10px] mb-1">HTTP Response for: {{ target_url }}</div>
+                <pre class="font-mono whitespace-pre-wrap">{{ response_data }}</pre>
+            </div>
+            {% endif %}
+
+            <form action="/app/fetch-url" method="GET" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Remote URL to Proxy</label>
+                    <input type="text" name="url" id="ssrf-input" value="http://169.254.169.254/latest/meta-data/" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-500">
+                </div>
+                <div class="flex items-center gap-3">
+                    <button type="submit" class="flex-1 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs rounded-xl transition">
+                        Fetch Remote Resource
+                    </button>
+                    <button type="button" onclick="document.getElementById('ssrf-input').value = 'https://api.github.com/zen'" class="px-3 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs transition">
+                        Fill Benign URL
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        {% else %}
+        <!-- Home / Welcome -->
+        <div class="text-center py-10 space-y-4 max-w-lg mx-auto">
+            <div class="w-16 h-16 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 text-2xl mx-auto">
+                <i class="fa-solid fa-server"></i>
+            </div>
+            <h2 class="text-xl font-bold text-white">Target Application in Controlled Environment</h2>
+            <p class="text-xs text-slate-400 leading-relaxed">
+                This simulated target application hosts endpoints vulnerable to SQLi, XSS, RCE, LFI, and SSRF.
+                When the <strong>WAF is ON</strong>, every attack is intercepted at the perimeter and blocked with a 403 Forbidden.
+                When the <strong>WAF is OFF</strong>, the vulnerable application executes the payload.
+            </p>
+            <div class="pt-4 flex justify-center gap-3">
+                <a href="/app/login" class="px-4 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs rounded-xl transition">
+                    Test SQL Injection Login
+                </a>
+                <a href="/app/ping" class="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl transition">
+                    Test Command Injection Ping
+                </a>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // WAF state toggle on the Target App page
+    const toggleBtn = document.getElementById('toggle-waf-state-btn');
+    const toggleBtnText = document.getElementById('waf-state-btn-text');
+
+    async function syncWafBtnState() {
+        try {
+            const res = await fetch('/api/config');
+            const data = await res.json();
+            if (data.engine_mode === 'On') {
+                toggleBtn.className = 'px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-950/50';
+                toggleBtnText.innerText = 'WAF is ENFORCING (Active)';
+            } else {
+                toggleBtn.className = 'px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-950/50';
+                toggleBtnText.innerText = 'WAF is OFF (Vulnerable!)';
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', async () => {
+            const res = await fetch('/api/config');
+            const data = await res.json();
+            const nextMode = data.engine_mode === 'On' ? 'Off' : 'On';
+
+            await fetch('/api/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ engine_mode: nextMode })
+            });
+
+            showToast('WAF Engine switched to: ' + nextMode, nextMode === 'On' ? 'success' : 'error');
+            syncWafBtnState();
+            fetchConfig(); // sync global header
+        });
+        syncWafBtnState();
+    }
+</script>
+{% endblock %}

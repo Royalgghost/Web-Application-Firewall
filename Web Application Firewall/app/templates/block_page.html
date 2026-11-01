@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>403 Forbidden - ModSecurity Web Application Firewall</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @keyframes pulse-shield {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.05); opacity: 0.85; }
+        }
+        .shield-pulse {
+            animation: pulse-shield 2.5s infinite ease-in-out;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex items-center justify-center p-4 antialiased">
+    <div class="max-w-3xl w-full bg-slate-900 border border-red-500/30 rounded-2xl shadow-2xl overflow-hidden">
+        <!-- Banner -->
+        <div class="bg-gradient-to-r from-red-900/80 via-red-800/60 to-slate-900 p-6 border-b border-red-500/30 flex items-center gap-5">
+            <div class="w-16 h-16 rounded-2xl bg-red-500/20 border border-red-500/40 flex items-center justify-center text-red-400 text-3xl shield-pulse">
+                <i class="fa-solid fa-shield-halved"></i>
+            </div>
+            <div>
+                <div class="flex items-center gap-3">
+                    <span class="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-red-500/20 text-red-400 border border-red-500/30">
+                        HTTP 403 Forbidden
+                    </span>
+                    <span class="text-xs text-slate-400 font-mono">ModSecurity v3 / OWASP CRS</span>
+                </div>
+                <h1 class="text-2xl font-bold text-white mt-1">Access Intercepted & Blocked</h1>
+                <p class="text-sm text-red-200/80">This request violated active perimeter Web Application Firewall security policies.</p>
+            </div>
+        </div>
+
+        <!-- Body Details -->
+        <div class="p-6 space-y-6">
+            <!-- Alert Callout -->
+            <div class="bg-red-950/40 border border-red-500/30 rounded-xl p-4 text-sm text-red-200">
+                <div class="flex items-start gap-3">
+                    <i class="fa-solid fa-triangle-exclamation text-red-400 text-lg mt-0.5"></i>
+                    <div>
+                        <span class="font-semibold text-white">Detection Reason:</span>
+                        <p class="mt-1 font-mono text-xs bg-slate-950/70 p-2.5 rounded-lg border border-red-900/40 text-red-300">
+                            {{ block_reason or "Inbound Anomaly Score exceeded threshold." }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Metadata Grid -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-3">
+                    <span class="text-slate-400 block font-medium">Transaction ID</span>
+                    <span class="font-mono text-cyan-400 font-semibold text-sm">{{ tx.id }}</span>
+                </div>
+                <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-3">
+                    <span class="text-slate-400 block font-medium">Client IP</span>
+                    <span class="font-mono text-slate-200 font-semibold text-sm">{{ client_ip }}</span>
+                </div>
+                <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-3">
+                    <span class="text-slate-400 block font-medium">Anomaly Score</span>
+                    <span class="font-mono text-red-400 font-bold text-sm">{{ anomaly_score }} / {{ threshold }} (Threshold)</span>
+                </div>
+                <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-3">
+                    <span class="text-slate-400 block font-medium">Blocking Rule ID</span>
+                    <span class="font-mono text-amber-400 font-semibold text-sm">{{ rule_id }}</span>
+                </div>
+            </div>
+
+            <!-- Matched Rules List -->
+            {% if matches %}
+            <div>
+                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Triggered ModSecurity Directives</h3>
+                <div class="space-y-2 max-h-48 overflow-y-auto pr-1">
+                    {% for m in matches %}
+                    <div class="bg-slate-800/40 border border-slate-700/60 rounded-lg p-3 text-xs">
+                        <div class="flex items-center justify-between gap-2 mb-1">
+                            <span class="font-mono font-bold text-amber-400">Rule [{{ m.rule_id }}]</span>
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase {% if m.severity == 'CRITICAL' %}bg-red-500/20 text-red-400 border border-red-500/30{% else %}bg-amber-500/20 text-amber-400 border border-amber-500/30{% endif %}">
+                                {{ m.severity }} (+{{ m.anomaly_score }} pts)
+                            </span>
+                        </div>
+                        <p class="text-slate-300">{{ m.message }}</p>
+                        <div class="mt-1 font-mono text-[11px] text-slate-400">
+                            Target: <span class="text-cyan-300">{{ m.variable_name }}</span> | Match: <span class="text-red-300 bg-red-950/60 px-1 py-0.5 rounded">{{ m.matched_data }}</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Action buttons -->
+            <div class="pt-2 flex flex-wrap gap-3">
+                <a href="/" class="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-medium text-xs transition flex items-center gap-2">
+                    <i class="fa-solid fa-gauge"></i> Open WAF Dashboard
+                </a>
+                <a href="/simulator" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium text-xs border border-slate-700 transition flex items-center gap-2">
+                    <i class="fa-solid fa-flask"></i> Inspect in Attack Sandbox
+                </a>
+                <a href="/app/" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium text-xs border border-slate-700 transition flex items-center gap-2">
+                    <i class="fa-solid fa-arrow-left"></i> Return to Target App
+                </a>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="bg-slate-950/80 px-6 py-3 border-t border-slate-800/80 text-[11px] text-slate-500 flex justify-between items-center">
+            <span>Powered by ModSecurity Simulator Engine</span>
+            <span>SecAuditLog Reference: {{ tx.id }}</span>
+        </div>
+    </div>
+</body>
+</html>
